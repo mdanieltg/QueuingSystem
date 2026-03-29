@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using QueuingSystem.Backend.DataTransferObjects;
 using QueuingSystem.Backend.Models;
@@ -5,7 +6,17 @@ using QueuingSystem.Backend.Models;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddCors();
+builder.Services.AddCors(options =>
+{
+    string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    CorsPolicyBuilder policyBuilder = new CorsPolicyBuilder(origins)
+        .AllowAnyMethod()
+        .AllowAnyHeader();
+
+    options.AddDefaultPolicy(!builder.Environment.IsDevelopment()
+        ? policyBuilder.Build()
+        : policyBuilder.AllowAnyOrigin().Build());
+});
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -18,10 +29,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors(options => options
-    .AllowAnyOrigin()
-    .AllowAnyMethod()
-    .AllowAnyHeader());
+app.UseCors();
 
 HashSet<Turn> turns = [];
 HashSet<Runner> runners = [];
