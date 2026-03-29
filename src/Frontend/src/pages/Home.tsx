@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { enroll } from "../api/runnersApi.ts";
+import { RunnerRole } from "../models/RunnerRole.ts";
 
 export default function Home() {
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState<RunnerRole | "">("");
   const [station, setStation] = useState("");
   const [roleError, setRoleError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  async function handleMachineTurn() {
+  function handleMachineTurn() {
     navigate("/turns");
   }
 
-  async function handleEnroll(event: React.SubmitEvent<HTMLFormElement>) {
+  async function handleEnroll(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     // Validate role and station
@@ -37,32 +38,16 @@ export default function Home() {
       navigate("/role");
     } catch (err) {
       console.error(err);
-      if (err instanceof Error) {
-        setRoleError(err.message);
-        return;
-      }
-      setRoleError("Error al intentar enrolar");
+      setRoleError(err instanceof Error ? err.message : "Error al intentar enrolar");
     }
   }
 
   useEffect(() => {
-    // If we already have a role and station in the local storage upon activation, redirect to /role
-    if (localStorage.getItem("id")) {
-      // Re-register the role and station with the API
-      enroll(role, station)
-        .then(() => {
-          navigate("/role");
-        })
-        .catch((err) => {
-          console.error(err);
-          if (err instanceof Error) {
-            setRoleError(err.message);
-            return;
-          }
-          setRoleError("Error al intentar enrollar");
-        });
+    const storedId = localStorage.getItem("id");
+    if (storedId) {
+      navigate("/role");
     }
-  }, [role, station, navigate]);
+  }, [navigate]);
 
   return (
     <div>
@@ -77,10 +62,10 @@ export default function Home() {
             <label htmlFor="role">Rol:</label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value)} id="role">
+              onChange={e => setRole(e.target.value as RunnerRole)} id="role">
               <option value="">Selecciona un rol</option>
-              <option value="cajero">Cajero</option>
-              <option value="ejecutivo">Ejecutivo</option>
+              <option value={RunnerRole.CAJERO}>Cajero</option>
+              <option value={RunnerRole.EJECUTIVO}>Ejecutivo</option>
             </select>
             <label htmlFor="station">Estación</label>
             <input value={station}

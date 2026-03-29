@@ -1,16 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getRunner, toggleRunner, unenroll } from "../api/runnersApi.ts";
 import { assignTurn } from "../api/turnsApi.ts";
+import type { RunnerRole } from "../models/RunnerRole.ts";
 
 export default function RoleRunner() {
   const [id, setId] = useState<string>(localStorage.getItem("id") || "");
-  const [role, setRole] = useState<string>(localStorage.getItem("role") || "");
+  const [role, setRole] = useState<RunnerRole | "">(localStorage.getItem("role") as RunnerRole || "");
   const [station, setStation] = useState<string>(localStorage.getItem("station") || "");
   const [active, setActive] = useState<boolean>(false);
   const [turn, setTurn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const logout = useCallback(() => {
+    localStorage.clear();
+    navigate("/");
+  }, [navigate]);
 
   async function requestTurn() {
     if (!id) return;
@@ -18,14 +24,10 @@ export default function RoleRunner() {
 
     try {
       const assignment = await assignTurn(id);
-      setTurn(assignment?.turn ?? null);
+      setTurn(assignment.turn);
     } catch (err) {
       console.error(err);
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Unknown error");
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -37,11 +39,7 @@ export default function RoleRunner() {
       setActive(await toggleRunner(id));
     } catch (err) {
       console.error(err);
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Unknown error");
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -50,53 +48,39 @@ export default function RoleRunner() {
     setError(null);
 
     try {
-      // Call API to unregister role and station
       await unenroll(id);
-
-      // Clear local storage
-      localStorage.clear();
-
-      // Redirect to home
-      navigate("/");
+      logout();
     } catch (err) {
       console.error(err);
       if (err instanceof Error && err.message.includes("Runner not found")) {
-        // Clear local storage
-        localStorage.clear();
-
-        // Redirect to home
-        navigate("/");
-
+        logout();
         return;
       }
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Unknown error");
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   }
 
   useEffect(() => {
-    // If we don't have an id, role, and station in the local storage upon activation, redirect to /
-    if (!localStorage.getItem("id")) {
+    if (!id) {
       navigate("/");
+      return;
     }
 
-    // Fetch Runner information
-    getRunner(id)
-      .then(runner => {
+    async function fetchRunner() {
+      try {
+        const runner = await getRunner(id);
         setId(runner.id);
         setRole(runner.role);
         setStation(runner.station);
         setActive(runner.isActive);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error(err);
-        localStorage.clear();
-        navigate("/");
-      });
-  }, [id, navigate]);
+        logout();
+      }
+    }
+
+    fetchRunner();
+  }, [id, navigate, logout]);
 
   return (
     <div>

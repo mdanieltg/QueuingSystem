@@ -33,11 +33,10 @@ export async function getAssignations() {
   }
 }
 
-export async function assignTurn(runnerId: string) {
+export async function assignTurn(runnerId: string): Promise<TurnAssignment | null> {
   try {
     const response = await axiosClient.post<TurnAssignment>(`/turns/assign/${runnerId}`);
-    if (response.status === 200) return response.data;
-    return null;
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 400) throw new Error("Runner is inactive");
     if (axios.isAxiosError(error) && error.response?.status === 404) throw new Error("Runner not found");

@@ -1,21 +1,19 @@
 import { useState } from "react";
 import { newTurn } from "../api/turnsApi";
+import { RunnerRole } from "../models/RunnerRole.ts";
 
 export default function TurnMachine() {
   const [turn, setTurn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function requestTurn(type: "cajero" | "ejecutivo") {
+  async function requestTurn(type: RunnerRole) {
     try {
       const turn = await newTurn(type);
       setTurn(turn.code);
+      setError(null);
     } catch (err) {
       console.error(err);
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Unknown error");
+      setError(err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -24,8 +22,8 @@ export default function TurnMachine() {
       <h1>Bienvenido</h1>
       <p>Por favor selecciona una opción para ser atendido:</p>
       <div>
-        <button onClick={() => requestTurn("cajero")}>Ventanilla</button>
-        <button onClick={() => requestTurn("ejecutivo")}>Ejecutivo</button>
+        <button onClick={() => requestTurn(RunnerRole.CAJERO)}>Ventanilla</button>
+        <button onClick={() => requestTurn(RunnerRole.EJECUTIVO)}>Ejecutivo</button>
       </div>
       {turn &&
         <div>

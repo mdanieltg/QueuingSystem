@@ -1,37 +1,37 @@
 import { getAssignations, getTurns } from "../api/turnsApi.ts";
 import { useEffect, useState } from "react";
 import type { TurnAssignment } from "../models/TurnAssignment.ts";
+import { RunnerRole } from "../models/RunnerRole.ts";
 
 export default function Screen() {
-  const [currentTurn, setCurrentTurn] = useState<TurnAssignment | null>(null);
   const [ejecutivoTurns, setEjecutivoTurns] = useState<TurnAssignment[]>([]);
   const [ventanillaTurns, setVentanillaTurns] = useState<TurnAssignment[]>([]);
   const [queue, setQueue] = useState<number>(0);
 
   useEffect(() => {
-    getTurns()
-      .then(turns => {
+    async function fetchData() {
+      try {
+        const turns = await getTurns();
         setQueue(turns.totalTurns);
-      })
-      .catch(error => {
+      } catch (error) {
         console.error("Error fetching turns:", error);
-      });
-    getAssignations()
-      .then(turns => {
-        setEjecutivoTurns(turns.find(t => t.type === "ejecutivo")?.assignations ?? []);
-        setVentanillaTurns(turns.find(t => t.type === "cajero")?.assignations ?? []);
-      })
-      .catch(error => {
+      }
+
+      try {
+        const turns = await getAssignations();
+        setEjecutivoTurns(turns.find(t => t.type === RunnerRole.EJECUTIVO)?.assignations ?? []);
+        setVentanillaTurns(turns.find(t => t.type === RunnerRole.CAJERO)?.assignations ?? []);
+      } catch (error) {
         console.error("Error fetching assignations:", error);
-      });
-  }, [setQueue]);
+      }
+    }
+
+    fetchData();
+  }, []);
 
   return (
     <div>
       <h1>Turnos</h1>
-      {currentTurn &&
-        <h2>Turno {currentTurn.turn} {currentTurn.type} {currentTurn.station}</h2>
-      }
       <div>
         <h2>Ventanilla</h2>
         <ul>
