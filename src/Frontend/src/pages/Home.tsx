@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { enroll } from "../api/runnersApi.ts";
 
 export default function Home() {
   const [role, setRole] = useState("");
@@ -20,28 +21,48 @@ export default function Home() {
       return;
     }
 
-    if (!station || parseInt(station) <= 0) {
+    if (!station) {
       setRoleError("Por favor ingresa un número de estación válido");
       return;
     }
 
-    // Call API to enroll role and station (not implemented yet)
+    try {
+      // Call API to enroll role and station
+      const runner = await enroll(role, station);
 
-    // Save role and station in local storage
-    localStorage.setItem("role", role);
-    localStorage.setItem("station", station);
+      // Save id, role, and station in local storage
+      localStorage.setItem("id", runner.id);
 
-    // Redirect to role runner
-    navigate("/role");
+      // Redirect to role runner
+      navigate("/role");
+    } catch (err) {
+      console.error(err);
+      if (err instanceof Error) {
+        setRoleError(err.message);
+        return;
+      }
+      setRoleError("Error al intentar enrolar");
+    }
   }
 
   useEffect(() => {
     // If we already have a role and station in the local storage upon activation, redirect to /role
-    if (localStorage.getItem("role") && localStorage.getItem("station")) {
-      // Re-register the role and station with the API (not implemented yet)
-      navigate("/role");
+    if (localStorage.getItem("id")) {
+      // Re-register the role and station with the API
+      enroll(role, station)
+        .then(() => {
+          navigate("/role");
+        })
+        .catch((err) => {
+          console.error(err);
+          if (err instanceof Error) {
+            setRoleError(err.message);
+            return;
+          }
+          setRoleError("Error al intentar enrollar");
+        });
     }
-  }, [navigate]);
+  }, [role, station, navigate]);
 
   return (
     <div>
@@ -64,7 +85,7 @@ export default function Home() {
             <label htmlFor="station">Estación</label>
             <input value={station}
                    onChange={e => setStation(e.target.value)}
-                   type="number" id="station" placeholder="Número de estación" />
+                   type="text" id="station" placeholder="Número de estación" />
             <input type="submit" value="Enrolar" />
           </form>
           {roleError && <p style={{ color: "red" }}>{roleError}</p>}
