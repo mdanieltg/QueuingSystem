@@ -1,4 +1,4 @@
-# Turn System Backend
+# Queuing System Backend
 
 ## Requirements
 
@@ -18,7 +18,8 @@
 ### Runners
 
 #### `POST /api/v1/runners`
-Registers a new runner in the system.
+
+Registers a new runner in the system with status "Inactive" (`IsActive` set to `false`).
 
 **Parameters:**
 - `role` (string, required): The role assigned to the runner
@@ -39,27 +40,29 @@ Retrieves all registered runners in the system, organized by role.
 
 ---
 
-#### `DELETE /api/v1/runners/{id}`
+#### `DELETE /api/v1/runners/{runnerId}`
 Unregisters a runner from the system, preventing them from receiving new turns.
 
-If a turn is currently assigned to the runner, mark it as "Complete".
+If a turn is currently assigned to the runner, mark it as "Completed".
 
 **Parameters:**
-- `id` (string, required): The ID of the runner to unregister
+
+- `runnerId` (string, required): The ID of the runner to unregister
 
 **Response:** Confirmation of successful unregistration
 
 ---
 
-#### `POST /api/v1/runners/{id}/toggleStatus`
+#### `POST /api/v1/runners/{runnerId}/toggleStatus`
 Toggles the active/inactive status of a registered runner.
 
-If a turn is currently assigned to the runner, mark it as "Complete".
+If a turn is currently assigned to the runner, mark it as "Completed".
 
 **Parameters:**
-- `id` (string, required): The ID of the runner whose status to toggle
 
-**Response:** Returns the updated runner with new status
+- `runnerId` (string, required): The ID of the runner whose status to toggle
+
+**Response:** Returns the updated runner with the new status
 
 ### Turn
 
@@ -74,11 +77,12 @@ Creates a new turn and adds it to the queue for assignment.
 ---
 
 #### `GET /api/v1/turns`
-Retrieves all the turns in the system.
+
+Retrieves all the turns in the system, grouping by the role.
 
 **Parameters:**
-- `status` (string, optional): Filter turns by status, being "Created" the default filter
-- `role` (string, optional): Filter turns by role
+
+- `status` (string, required): Filter turns by status, being "Created" the default filter
 
 **Response:** Returns an object containing:
 - `totalTurns` (integer): Total count of available turns
@@ -86,10 +90,11 @@ Retrieves all the turns in the system.
 
 ---
 
-#### `POST /api/v1/turns/assign`
+#### `POST /api/v1/turns/assign/{runnerId}`
 Assigns the next available turn in the queue for a specified role to a runner at a station.
 
 **Parameters:**
-- `station` (string, required): The station identifier of the runner receiving the turn
+
+- `runnerId` (string, required): The ID of the runner to receive the turn
 
 **Response:** Returns the assigned turn object with updated status
