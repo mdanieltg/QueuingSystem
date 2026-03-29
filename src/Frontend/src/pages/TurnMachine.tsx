@@ -1,13 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getTurns, newTurn } from "../api/api";
 
 export default function TurnMachine() {
   const [turn, setTurn] = useState<string | null>(null);
+  const [queue, setQueue] = useState<number>(0);
 
   async function requestTurn(type: "ventanilla" | "ejecutivo") {
-    const message = `Solicitando turno para ${type}`;
-    console.log(message);
-    setTurn(message);
+    try {
+      const turn = await newTurn(type);
+      const turnsSummary = await getTurns();
+      setTurn(turn.code);
+      setQueue(turnsSummary.totalTurns);
+    } catch (err) {
+      console.error(err);
+    }
   }
+
+  useEffect(() => {
+    getTurns()
+      .then((turnsSummary) => {
+        setQueue(turnsSummary.totalTurns);
+      });
+  }, [setQueue]);
 
   return (
     <div>
@@ -23,6 +37,7 @@ export default function TurnMachine() {
           <button onClick={() => setTurn(null)}>Ok</button>
         </div>
       }
+      <div>{queue} clientes en espera</div>
     </div>
   );
 }
