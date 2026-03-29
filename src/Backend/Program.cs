@@ -33,23 +33,26 @@ app.UseCors();
 
 HashSet<Turn> turns = [];
 HashSet<Runner> runners = [];
+List<TurnAssignation> assignations = [];
 
 // API Endpoints: Runners
-app.MapPost("/api/v1/runners", RegisterRunner);
+app.MapPost("/api/v1/runners", EnrollRunner);
 app.MapGet("/api/v1/runners", GetRunners);
-app.MapDelete("/api/v1/runners/{runnerId:guid}", UnregisterRunner);
+app.MapGet("/api/v1/runners/{runnerId:guid}", GetRunner);
+app.MapDelete("/api/v1/runners/{runnerId:guid}", UnenrollRunner);
 app.MapPost("/api/v1/runners/{runnerId:guid}/toggleStatus", ToggleRunnerStatus);
 
 // API Endpoints: Turns
 app.MapPost("/api/v1/turns", CreateTurn);
 app.MapGet("/api/v1/turns", GetTurns);
+app.MapGet("/api/v1/turns/assign", GetAssignations);
 app.MapPost("/api/v1/turns/assign/{runnerId:guid}", AssignTurn);
 
 app.Run();
 
 return;
 
-IResult RegisterRunner([FromBody] NewRunner newRunner)
+IResult EnrollRunner([FromBody] NewRunner newRunner)
 {
     Runner? existingRunner = runners.FirstOrDefault(r => r.Station == newRunner.Station && r.Role == newRunner.Role);
     if (existingRunner is not null) return Results.Conflict();
@@ -81,7 +84,13 @@ IResult GetRunners()
     });
 }
 
-IResult UnregisterRunner([FromRoute] Guid runnerId)
+IResult GetRunner(Guid runnerId)
+{
+    Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
+    return runner is not null ? Results.Ok(runner) : Results.NotFound();
+}
+
+IResult UnenrollRunner([FromRoute] Guid runnerId)
 {
     Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
     if (runner is null) return Results.NotFound();
@@ -109,7 +118,7 @@ IResult ToggleRunnerStatus([FromRoute] Guid runnerId)
     }
 
     runner.IsActive = !runner.IsActive;
-    return Results.NoContent();
+    return Results.Ok(runner.IsActive);
 }
 
 IResult CreateTurn([FromQuery] string role)
@@ -149,6 +158,18 @@ IResult GetTurns([FromQuery] string status = "Created")
     });
 }
 
+IResult GetAssignations()
+{
+    return Results.Ok(
+        assignations
+            .GroupBy(a => a.Type, (type, enumerable) => new
+            {
+                type,
+                Assignations = enumerable.TakeLast(5).Reverse()
+            })
+    );
+}
+
 IResult AssignTurn([FromRoute] Guid runnerId)
 {
     Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
@@ -167,12 +188,17 @@ IResult AssignTurn([FromRoute] Guid runnerId)
     // Assign new turn
     turn.Status = TurnStatus.Assigned;
     runner.CurrentTurn = turn;
-    return Results.Ok(new TurnAssignation
+
+    // Store assignation 
+    var assignation = new TurnAssignation
     {
         Turn = turn.Code,
-        StationType = runner.Role,
+        Type = runner.Role,
         Station = runner.Station
-    });
+    };
+    assignations.Add(assignation);
+
+    return Results.Ok(assignation);
 }
 
 record NewRunner(string Role, string Station);
