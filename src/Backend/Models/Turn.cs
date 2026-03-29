@@ -1,4 +1,4 @@
-namespace TurnSystem.Backend.Models;
+namespace QueuingSystem.Backend.Models;
 
 public class Turn
 {

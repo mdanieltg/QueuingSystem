@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using TurnSystem.Backend.Models;
+using QueuingSystem.Backend.Models;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
