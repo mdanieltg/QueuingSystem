@@ -33,13 +33,14 @@ export async function getAssignations() {
   }
 }
 
-export async function assignTurn(runnerId: string): Promise<TurnAssignment | null> {
+export async function assignTurn(agentId: string): Promise<TurnAssignment | null> {
   try {
-    const response = await axiosClient.post<TurnAssignment>(`/turns/assign/${runnerId}`);
+    const response = await axiosClient.post<TurnAssignment>(`/turns/assign/${agentId}`);
+    if (response.status === 204) return null;
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 400) throw new Error("Runner is inactive");
-    if (axios.isAxiosError(error) && error.response?.status === 404) throw new Error("Runner not found");
+    if (axios.isAxiosError(error) && error.response?.status === 400) throw new Error("Agent is inactive");
+    if (axios.isAxiosError(error) && error.response?.status === 404) throw new Error("Agent not found");
     throw new Error("Unknown error when requesting a turn", { cause: error });
   }
 }

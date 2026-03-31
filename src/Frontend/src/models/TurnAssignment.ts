@@ -1,7 +1,7 @@
-import type { RunnerRole } from "./RunnerRole.ts";
+import type { AgentRole } from "./AgentRole.ts";
 
 export interface TurnAssignment {
   turn: string;
-  type: RunnerRole;
+  type: AgentRole;
   station: number;
 }

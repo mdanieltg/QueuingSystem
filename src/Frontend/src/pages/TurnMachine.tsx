@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { newTurn } from "../api/turnsApi";
-import { RunnerRole } from "../models/RunnerRole.ts";
+import { AgentRole } from "../models/AgentRole.ts";
 
 export default function TurnMachine() {
   const [turn, setTurn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function requestTurn(type: RunnerRole) {
+  async function requestTurn(type: AgentRole) {
     try {
       const turn = await newTurn(type);
       setTurn(turn.code);
@@ -18,20 +18,24 @@ export default function TurnMachine() {
   }
 
   return (
-    <div>
-      <h1>Bienvenido</h1>
-      <p>Por favor selecciona una opción para ser atendido:</p>
-      <div>
-        <button onClick={() => requestTurn(RunnerRole.CAJERO)}>Ventanilla</button>
-        <button onClick={() => requestTurn(RunnerRole.EJECUTIVO)}>Ejecutivo</button>
+    <div className="text-center">
+      <h1>Welcome</h1>
+      <p>Please select an option to be served:</p>
+      <div className="btn-group" role="group">
+        <button onClick={() => requestTurn(AgentRole.WINDOW)}
+                className="btn btn-outline-primary">Window
+        </button>
+        <button onClick={() => requestTurn(AgentRole.EXECUTIVE)}
+                className="btn btn-outline-primary">Executive
+        </button>
       </div>
       {turn &&
-        <div>
-          <p>Tu turno es: {turn}</p>
-          <button onClick={() => setTurn(null)}>Ok</button>
+        <div onClick={() => setTurn(null)}
+             className="mt-3 alert alert-secondary">
+          Turn: {turn}
         </div>
       }
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <div className="mt-3 alert alert-danger">{error}</div>}
     </div>
   );
 }
