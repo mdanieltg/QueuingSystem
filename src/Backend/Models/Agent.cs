@@ -1,6 +1,6 @@
 namespace QueuingSystem.Backend.Models;
 
-public class Runner
+public class Agent
 {
     public Guid Id { get; init; }
     public required string Role { get; init; }

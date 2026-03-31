@@ -1,76 +1,114 @@
 # Queuing System Backend
 
-## Requirements
+The Queuing System Backend is a service designed to manage the flow of turns and agents in a structured environment. It
+handles agent enrollment, status management, and turn assignment based on roles and stations.
 
-* I need to register runners, with their role and station
-* I need to create turns
-* I need to be able to get the current turn for a runner
-* I need to assign the next available turn to a runner when they request it
-* Runners can only have one turn at a time
-* Runners can only have turns assigned to them if they are registered AND active
-* Turns will queue up and be assigned to runners in the order they were created
-* Runners can unregister themselves, which will make them unable to receive turns until they register again
-* There needs to be an endpoint for listing all available turns, which can get filtered by requested role
-* There needs to be an endpoint for listing all registered runners, indicating whether they are active or not
+## How to Run
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd QueuingSystem/src/Backend
+   ```
+
+2. **Configure Secrets**:
+   The API uses an API Key middleware for authentication. You need to configure the allowed clients and their keys using
+   `dotnet user-secrets`:
+   ```bash
+   dotnet user-secrets set "ApiKey:AllowedClients:ClientName" "your-secret-api-key"
+   ```
+   Replace `ClientName` with a name for your client and `your-secret-api-key` with a secure key. The application expects
+   the `X-API-KEY` header to match one of these values.
+
+3. **Run the application**:
+   ```bash
+   dotnet run
+   ```
+   The API will be available at the configured URLs (`http://localhost:5277`, check `Properties/launchSettings.json`).
+
+4. **OpenAPI Documentation**:
+   When running in development mode, you can access the OpenAPI specification at `/openapi/v1.json`.
 
 ## Endpoints
 
-### Runners
+All endpoints require the `X-API-KEY` header for authentication.
 
-#### `POST /api/v1/runners`
+### Agents
 
-Registers a new runner in the system with status "Inactive" (`IsActive` set to `false`).
+#### `POST /api/v1/agents`
 
-**Parameters:**
-- `role` (string, required): The role assigned to the runner
-- `station` (string, required): The station where the runner is located
+Enrolls a new agent in the system with status "Inactive" (`IsActive` set to `false`).
 
-**Response:** Returns the newly created runner object with an assigned ID
+**Body:**
+
+- `role` (string, required): The role assigned to the agent
+- `station` (string, required): The station where the agent is located
+
+**Response:** Returns the newly enrolled agent object with an assigned ID
 
 ---
 
-#### `GET /api/v1/runners`
-Retrieves all registered runners in the system, organized by role.
+#### `GET /api/v1/agents`
+
+Retrieves all enrolled agents in the system, organized by role.
 
 **Parameters:** None
 
 **Response:** Returns an object containing:
-- `totalRunners` (integer): Total count of registered runners
-- `runners` (object): Runners grouped by role, with active/inactive status for each
+
+- `totalAgents` (integer): Total count of enrolled agents
+- `agentsByRole` (array): List of agent groups, each containing a `role` and its list of `agents`
 
 ---
 
-#### `DELETE /api/v1/runners/{runnerId}`
-Unregisters a runner from the system, preventing them from receiving new turns.
+#### `GET /api/v1/agents/{agentId}`
 
-If a turn is currently assigned to the runner, mark it as "Completed".
+Retrieves a specific agent by ID.
 
 **Parameters:**
 
-- `runnerId` (string, required): The ID of the runner to unregister
+- `agentId` (guid, required): The ID of the agent
 
-**Response:** Confirmation of successful unregistration
+**Response:** The agent object or 404 if not found.
 
 ---
 
-#### `POST /api/v1/runners/{runnerId}/toggleStatus`
-Toggles the active/inactive status of a registered runner.
+#### `DELETE /api/v1/agents/{agentId}`
 
-If a turn is currently assigned to the runner, mark it as "Completed".
+Unenrolls an agent from the system, preventing them from receiving new turns.
+
+If a turn is currently assigned to the agent, it is marked as "Completed".
 
 **Parameters:**
 
-- `runnerId` (string, required): The ID of the runner whose status to toggle
+- `agentId` (guid, required): The ID of the agent to unenroll
 
-**Response:** Returns the updated runner with the new status
+**Response:** 204 No Content on success or 404 if not found.
 
-### Turn
+---
+
+#### `POST /api/v1/agents/{agentId}/toggleStatus`
+
+Toggles the active/inactive status of an enrolled agent.
+
+If an agent is toggled from active to inactive and has an assigned turn, the turn is marked as "Completed".
+
+**Parameters:**
+
+- `agentId` (guid, required): The ID of the agent whose status to toggle
+
+**Response:** Returns the new status (boolean)
+
+---
+
+### Turns
 
 #### `POST /api/v1/turns`
 Creates a new turn and adds it to the queue for assignment.
 
 **Parameters:**
-- `role` (string, required): The role required for this turn
+
+- `role` (query string, required): The role required for this turn
 
 **Response:** Returns the newly created turn object with initial status "Created"
 
@@ -78,23 +116,35 @@ Creates a new turn and adds it to the queue for assignment.
 
 #### `GET /api/v1/turns`
 
-Retrieves all the turns in the system, grouping by the role.
+Retrieves turns in the system, grouping by the role.
 
 **Parameters:**
 
-- `status` (string, required): Filter turns by status, being "Created" the default filter
+- `status` (query string, optional): Filter turns by status ("Created", "Assigned", "Completed"). Defaults to "Created".
 
 **Response:** Returns an object containing:
-- `totalTurns` (integer): Total count of available turns
-- `turnsByRole` (object): Turn counts grouped by requested role
+
+- `totalTurns` (integer): Total count of turns matching the status
+- `turnsByRole` (array): Turns grouped by requested role
 
 ---
 
-#### `POST /api/v1/turns/assign/{runnerId}`
-Assigns the next available turn in the queue for a specified role to a runner at a station.
+#### `GET /api/v1/turns/assign`
+
+Retrieves the most recent turn assignations, grouped by role (type).
+
+**Parameters:** None
+
+**Response:** Returns a list of assignation groups, showing the last 5 assignations per role.
+
+---
+
+#### `POST /api/v1/turns/assign/{agentId}`
+
+Assigns the next available turn in the queue for the agent's role.
 
 **Parameters:**
 
-- `runnerId` (string, required): The ID of the runner to receive the turn
+- `agentId` (guid, required): The ID of the agent to receive the turn
 
-**Response:** Returns the assigned turn object with updated status
+**Response:** Returns the assigned turn object or 204 if no turns are available for the agent's role.

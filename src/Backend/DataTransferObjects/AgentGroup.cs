@@ -2,8 +2,8 @@ using QueuingSystem.Backend.Models;
 
 namespace QueuingSystem.Backend.DataTransferObjects;
 
-public class RunnerGroup
+public class AgentGroup
 {
     public required string Role { get; init; }
-    public required IEnumerable<Runner> Runners { get; init; }
+    public required IEnumerable<Agent> Agents { get; init; }
 }

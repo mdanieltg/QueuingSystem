@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
-using QueuingSystem.Backend.DataTransferObjects;
+using Microsoft.Extensions.Primitives;
 using QueuingSystem.Backend.Models;
+using QueuingSystem.Backend.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddSingleton<IQueueService, QueueService>();
+
 builder.Services.AddCors(options =>
 {
     string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -31,174 +34,84 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 
-HashSet<Turn> turns = [];
-HashSet<Runner> runners = [];
-List<TurnAssignation> assignations = [];
+// API Key Middleware
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Headers.TryGetValue("X-API-KEY", out StringValues apiKey))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.Headers.WWWAuthenticate = "ApiKey";
+        return;
+    }
 
-// API Endpoints: Runners
-app.MapPost("/api/v1/runners", EnrollRunner);
-app.MapGet("/api/v1/runners", GetRunners);
-app.MapGet("/api/v1/runners/{runnerId:guid}", GetRunner);
-app.MapDelete("/api/v1/runners/{runnerId:guid}", UnenrollRunner);
-app.MapPost("/api/v1/runners/{runnerId:guid}/toggleStatus", ToggleRunnerStatus);
+    var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+    Dictionary<string, string> allowedClients = configuration
+                                                    .GetSection("ApiKey:AllowedClients")
+                                                    .Get<Dictionary<string, string>>()
+                                                ?? new Dictionary<string, string>();
+
+    if (allowedClients.Values.All(k => k != apiKey))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        context.Response.Headers.WWWAuthenticate = "ApiKey";
+        return;
+    }
+
+    await next(context);
+});
+
+// API Endpoints: Agents
+RouteGroupBuilder agentsApi = app.MapGroup("/api/v1/agents");
+
+agentsApi.MapPost("/", EnrollAgent);
+agentsApi.MapGet("/", (IQueueService service) => Results.Ok(service.GetAgentsSummary()));
+agentsApi.MapGet("/{agentId:guid}", (Guid agentId, IQueueService service) =>
+    service.GetAgent(agentId) is { } agent ? Results.Ok(agent) : Results.NotFound());
+agentsApi.MapDelete("/{agentId:guid}", (Guid agentId, IQueueService service) =>
+    service.UnenrollAgent(agentId) ? Results.NoContent() : Results.NotFound());
+agentsApi.MapPost("/{agentId:guid}/toggleStatus", (Guid agentId, IQueueService service) =>
+    service.ToggleAgentStatus(agentId) switch
+    {
+        { } isActive => Results.Ok(isActive),
+        _ => Results.NotFound()
+    });
 
 // API Endpoints: Turns
-app.MapPost("/api/v1/turns", CreateTurn);
-app.MapGet("/api/v1/turns", GetTurns);
-app.MapGet("/api/v1/turns/assign", GetAssignations);
-app.MapPost("/api/v1/turns/assign/{runnerId:guid}", AssignTurn);
+RouteGroupBuilder turnsApi = app.MapGroup("/api/v1/turns");
+
+turnsApi.MapPost("/", (string role, IQueueService service) => Results.Ok(service.CreateTurn(role)));
+turnsApi.MapGet("/", (IQueueService service, [FromQuery] string status = "Created") =>
+!Enum.TryParse(status, true, out TurnStatus turnStatus)
+    ? Results.BadRequest("Invalid status")
+    : Results.Ok((object?) service.GetTurnsSummary(turnStatus)));
+turnsApi.MapGet("/assign", (IQueueService service) => Results.Ok(service.GetAssignations()));
+turnsApi.MapPost("/assign/{agentId:guid}", (Guid agentId, IQueueService service) =>
+{
+    try
+    {
+        return service.AssignTurn(agentId) is { } assignation ? Results.Ok(assignation) : Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
 
 app.Run();
 
 return;
 
-IResult EnrollRunner([FromBody] NewRunner newRunner)
+IResult EnrollAgent([FromBody] NewAgent newAgent, IQueueService service)
 {
-    Runner? existingRunner = runners.FirstOrDefault(r => r.Station == newRunner.Station && r.Role == newRunner.Role);
-    if (existingRunner is not null) return Results.Conflict();
-
-    Runner runner = new()
+    try
     {
-        Id = Guid.NewGuid(),
-        Role = newRunner.Role,
-        Station = newRunner.Station,
-        IsActive = false
-    };
-    runners.Add(runner);
-
-    return Results.Ok(runner);
-}
-
-IResult GetRunners()
-{
-    return Results.Ok(new RunnersSummary
-    {
-        TotalRunners = runners.Count,
-        RunnersByRole = runners
-            .OrderBy(r => r.Station)
-            .GroupBy(r => r.Role, (role, runnerCollection) => new RunnerGroup
-            {
-                Role = role,
-                Runners = runnerCollection
-            })
-    });
-}
-
-IResult GetRunner(Guid runnerId)
-{
-    Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
-    return runner is not null ? Results.Ok(runner) : Results.NotFound();
-}
-
-IResult UnenrollRunner([FromRoute] Guid runnerId)
-{
-    Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
-    if (runner is null) return Results.NotFound();
-
-    // Complete ending turn
-    runner.CurrentTurn?.Status = TurnStatus.Completed;
-    runner.CurrentTurn?.CompletedAt = DateTime.UtcNow;
-    runner.CurrentTurn = null;
-
-    runners.Remove(runner);
-    return Results.NoContent();
-}
-
-IResult ToggleRunnerStatus([FromRoute] Guid runnerId)
-{
-    Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
-    if (runner is null) return Results.NotFound();
-
-    // Complete ending turn if going inactive
-    if (runner.IsActive)
-    {
-        runner.CurrentTurn?.Status = TurnStatus.Completed;
-        runner.CurrentTurn?.CompletedAt = DateTime.UtcNow;
-        runner.CurrentTurn = null;
+        Agent runner = service.EnrollAgent(newAgent.Role, newAgent.Station);
+        return Results.Ok(runner);
     }
-
-    runner.IsActive = !runner.IsActive;
-    return Results.Ok(runner.IsActive);
-}
-
-IResult CreateTurn([FromQuery] string role)
-{
-    var newGuid = Guid.NewGuid();
-    Turn turn = new()
+    catch (InvalidOperationException)
     {
-        Id = newGuid,
-        Code = newGuid.ToString("N")[28..],
-        Role = role,
-        Status = TurnStatus.Created,
-        CreatedAt = DateTime.UtcNow
-    };
-
-    turns.Add(turn);
-    return Results.Ok(turn);
+        return Results.Conflict();
+    }
 }
 
-
-IResult GetTurns([FromQuery] string status = "Created")
-{
-    bool parsed = Enum.TryParse(status, ignoreCase: true, out TurnStatus turnStatus);
-    if (!parsed) return Results.BadRequest("Invalid status");
-
-    List<Turn> filteredTurns = turns.Where(t => t.Status == turnStatus)
-        .OrderBy(t => t.CreatedAt)
-        .ToList();
-
-    return Results.Ok(new TurnsSummary
-    {
-        TotalTurns = filteredTurns.Count,
-        TurnsByRole = filteredTurns.GroupBy(t => t.Role, (role, turnCollection) => new TurnGroup
-        {
-            Role = role,
-            Turns = turnCollection
-        })
-    });
-}
-
-IResult GetAssignations()
-{
-    return Results.Ok(
-        assignations
-            .GroupBy(a => a.Type, (type, enumerable) => new
-            {
-                type,
-                Assignations = enumerable.TakeLast(5).Reverse()
-            })
-    );
-}
-
-IResult AssignTurn([FromRoute] Guid runnerId)
-{
-    Runner? runner = runners.FirstOrDefault(r => r.Id == runnerId);
-    if (runner is null) return Results.NotFound();
-    if (!runner.IsActive) return Results.BadRequest();
-
-    Turn? turn = turns.Where(t => t.Role == runner.Role && t.Status == TurnStatus.Created)
-        .OrderBy(t => t.CreatedAt)
-        .FirstOrDefault();
-    if (turn is null) return Results.NoContent();
-
-    // Complete ending turn
-    runner.CurrentTurn?.Status = TurnStatus.Completed;
-    runner.CurrentTurn?.CompletedAt = DateTime.UtcNow;
-
-    // Assign new turn
-    turn.Status = TurnStatus.Assigned;
-    runner.CurrentTurn = turn;
-
-    // Store assignation 
-    var assignation = new TurnAssignation
-    {
-        Turn = turn.Code,
-        Type = runner.Role,
-        Station = runner.Station
-    };
-    assignations.Add(assignation);
-
-    return Results.Ok(assignation);
-}
-
-record NewRunner(string Role, string Station);
+record NewAgent(string Role, string Station);
