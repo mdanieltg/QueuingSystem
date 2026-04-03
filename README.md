@@ -1,7 +1,7 @@
-# Máquina de turnos
+# Queuing Machine
 
-Este proyecto ejemplifica el funcionamiento de un sistema de turnos para atención al cliente/usuario.
+This project demonstrates the operation of a queuing system for customer/user service.
 
-Los casos de uso varían desde Bancos, Centros de Atención al Cliente, o instancias gubernamentales.
+Use cases vary from Banks, Customer Service Centers, or government agencies.
 
-Actualmente los roles están fijados a roles de atención de sucursal bancaria.
+Currently, the roles are fixed to bank branch service roles.
