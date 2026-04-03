@@ -95,9 +95,9 @@ agentsApi.MapPost("/{agentId:guid}/toggleStatus", (Guid agentId, IQueueService s
 // API Endpoints: Turns
 RouteGroupBuilder turnsApi = app.MapGroup("/api/v1/turns");
 
-turnsApi.MapPost("/", async (string role, IQueueService service, IHubContext<TurnsHub> hub) =>
+turnsApi.MapPost("/", async (string role, IQueueService service, IHubContext<TurnsHub, ITurnClient> hub) =>
 {
-    await hub.Clients.All.SendAsync("turnCreated");
+    await hub.Clients.All.TurnCreated();
     return Results.Ok(service.CreateTurn(role));
 });
 turnsApi.MapGet("/", (IQueueService service, [FromQuery] string status = "Created") =>
@@ -105,12 +105,13 @@ turnsApi.MapGet("/", (IQueueService service, [FromQuery] string status = "Create
     ? Results.BadRequest("Invalid status")
     : Results.Ok((object?) service.GetTurnsSummary(turnStatus)));
 turnsApi.MapGet("/assign", (IQueueService service) => Results.Ok(service.GetAssignations()));
-turnsApi.MapPost("/assign/{agentId:guid}", async (Guid agentId, IQueueService service, IHubContext<TurnsHub> hub) =>
+turnsApi.MapPost("/assign/{agentId:guid}", async (Guid agentId, IQueueService service, IHubContext<TurnsHub,
+    ITurnClient> hub) =>
 {
     try
     {
         if (service.AssignTurn(agentId) is not { } assignation) return Results.NoContent();
-        await hub.Clients.All.SendAsync("turnAssigned", assignation.Turn, assignation.Type, assignation.Station);
+        await hub.Clients.All.TurnAssigned(assignation.Turn, assignation.Type, assignation.Station);
         return Results.Ok(assignation);
     }
     catch (InvalidOperationException ex)
