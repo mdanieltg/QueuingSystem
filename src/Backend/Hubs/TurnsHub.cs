@@ -9,5 +9,5 @@ public class TurnsHub : Hub
         await Clients.All.SendAsync("turnCreated");
 
     public async ValueTask TurnAssigned(TurnAssignation assignation) =>
-        await Clients.All.SendAsync("turnAssigned", assignation.Turn, assignation.Station);
+        await Clients.All.SendAsync("turnAssigned", assignation.Turn, assignation.Type, assignation.Station);
 }
