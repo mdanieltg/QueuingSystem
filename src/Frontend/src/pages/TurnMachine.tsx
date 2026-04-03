@@ -20,7 +20,7 @@ export default function TurnMachine() {
   return (
     <div className="text-center">
       <h1>Welcome</h1>
-      <p>Please select an option to be served:</p>
+      <p>Please select an option to be attended</p>
       <div className="btn-group" role="group">
         <button onClick={() => requestTurn(AgentRole.WINDOW)}
                 className="btn btn-outline-primary">Window

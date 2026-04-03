@@ -95,13 +95,13 @@ export default function AgentDashboard() {
       </h2>
 
       {turn
-        ? <p>Serving <span className="fw-bold">{turn}</span></p>
+        ? <p>Attending <span className="fw-bold">{turn}</span></p>
         : <p>Waiting...</p>}
       <div className="btn-group" role="group">
         <button onClick={requestTurn} className="btn btn-outline-primary">Request turn</button>
-        {active
-          ? <button onClick={pauseResumeSession} className={"btn btn-outline-warning"}>Pause service</button>
-          : <button onClick={pauseResumeSession} className={"btn btn-outline-success"}>Resume service</button>}
+        <button onClick={pauseResumeSession} className={active ? "btn btn-outline-warning" : "btn btn-outline-success"}>
+          {active ? "Pause" : "Resume"} service
+        </button>
         <button onClick={unregister} className="btn btn-outline-danger">End session</button>
       </div>
       {error && <div className="mt-3 alert alert-danger">{error}</div>}
