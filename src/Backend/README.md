@@ -26,12 +26,33 @@ handles agent enrollment, status management, and turn assignment based on roles 
    ```
    The API will be available at the configured URLs (`http://localhost:5277`, check `Properties/launchSettings.json`).
 
-4. **OpenAPI Documentation**:
+4. **Configure CORS**:
+   The application requires CORS to be configured in `appsettings.json` or through environment variables to allow the
+   frontend to connect:
+   ```json
+   "Cors": {
+     "AllowedOrigins": ["http://localhost:5173"]
+   }
+   ```
+   Replace `http://localhost:5173` with your frontend URL.
+
+5. **OpenAPI Documentation**:
    When running in development mode, you can access the OpenAPI specification at `/openapi/v1.json`.
 
 ## Endpoints
 
-All endpoints require the `X-API-KEY` header for authentication.
+All REST endpoints require the `X-API-KEY` header for authentication.
+
+### SignalR Hub
+
+The application uses SignalR for real-time updates.
+
+- **Hub URL:** `/ws/turns`
+
+**Client methods (Events):**
+
+- `TurnCreated()`: Triggered when a new turn is created.
+- `TurnAssigned(string turn, string type, string station)`: Triggered when a turn is assigned to an agent.
 
 ### Agents
 
