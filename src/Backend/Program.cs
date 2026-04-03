@@ -14,6 +14,8 @@ builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddCors(options =>
 {
     string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    if (origins.Length == 0)
+        throw new InvalidOperationException("No allowed origins configured in appsettings.json");
 
     options.AddDefaultPolicy(new CorsPolicyBuilder(origins)
         .AllowAnyMethod()
@@ -35,13 +37,14 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseStaticFiles();
 app.UseCors();
-app.MapHub<TurnsHub>("/ws/turns");
 
 // API Key Middleware
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/ws"))
+    // Require API key for /api resources only
+    if (!context.Request.Path.StartsWithSegments("/api"))
     {
         await next(context);
         return;
@@ -69,6 +72,9 @@ app.Use(async (context, next) =>
 
     await next(context);
 });
+
+// SignalR hubs
+app.MapHub<TurnsHub>("/ws/turns");
 
 // API Endpoints: Agents
 RouteGroupBuilder agentsApi = app.MapGroup("/api/v1/agents");
@@ -113,6 +119,7 @@ turnsApi.MapPost("/assign/{agentId:guid}", async (Guid agentId, IQueueService se
     }
 });
 
+app.MapFallbackToFile("index.html");
 app.Run();
 
 return;
