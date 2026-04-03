@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Primitives;
+using QueuingSystem.Backend.Hubs;
 using QueuingSystem.Backend.Models;
 using QueuingSystem.Backend.Services;
 
@@ -12,14 +14,15 @@ builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddCors(options =>
 {
     string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-    CorsPolicyBuilder policyBuilder = new CorsPolicyBuilder(origins)
-        .AllowAnyMethod()
-        .AllowAnyHeader();
 
-    options.AddDefaultPolicy(!builder.Environment.IsDevelopment()
-        ? policyBuilder.Build()
-        : policyBuilder.AllowAnyOrigin().Build());
+    options.AddDefaultPolicy(new CorsPolicyBuilder(origins)
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials()
+        .Build());
 });
+
+builder.Services.AddSignalR();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -33,10 +36,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.MapHub<TurnsHub>("/ws/turns");
 
 // API Key Middleware
 app.Use(async (context, next) =>
 {
+    if (context.Request.Path.StartsWithSegments("/ws"))
+    {
+        await next(context);
+        return;
+    }
+
     if (!context.Request.Headers.TryGetValue("X-API-KEY", out StringValues apiKey))
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -79,17 +89,23 @@ agentsApi.MapPost("/{agentId:guid}/toggleStatus", (Guid agentId, IQueueService s
 // API Endpoints: Turns
 RouteGroupBuilder turnsApi = app.MapGroup("/api/v1/turns");
 
-turnsApi.MapPost("/", (string role, IQueueService service) => Results.Ok(service.CreateTurn(role)));
+turnsApi.MapPost("/", async (string role, IQueueService service, IHubContext<TurnsHub> hub) =>
+{
+    await hub.Clients.All.SendAsync("turnCreated");
+    return Results.Ok(service.CreateTurn(role));
+});
 turnsApi.MapGet("/", (IQueueService service, [FromQuery] string status = "Created") =>
 !Enum.TryParse(status, true, out TurnStatus turnStatus)
     ? Results.BadRequest("Invalid status")
     : Results.Ok((object?) service.GetTurnsSummary(turnStatus)));
 turnsApi.MapGet("/assign", (IQueueService service) => Results.Ok(service.GetAssignations()));
-turnsApi.MapPost("/assign/{agentId:guid}", (Guid agentId, IQueueService service) =>
+turnsApi.MapPost("/assign/{agentId:guid}", async (Guid agentId, IQueueService service, IHubContext<TurnsHub> hub) =>
 {
     try
     {
-        return service.AssignTurn(agentId) is { } assignation ? Results.Ok(assignation) : Results.NoContent();
+        if (service.AssignTurn(agentId) is not { } assignation) return Results.NoContent();
+        await hub.Clients.All.SendAsync("turnAssigned", assignation.Turn, assignation.Type, assignation.Station);
+        return Results.Ok(assignation);
     }
     catch (InvalidOperationException ex)
     {
