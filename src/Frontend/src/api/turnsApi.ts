@@ -3,7 +3,6 @@ import type { Turn } from "../models/Turn.ts";
 import type { TurnsSummary } from "../models/TurnsSummary.ts";
 import axios from "axios";
 import type { TurnAssignment } from "../models/TurnAssignment.ts";
-import type { AssignmentSummary } from "../models/AssignmentSummary.ts";
 
 export async function newTurn(type: string) {
   try {
@@ -26,7 +25,7 @@ export async function getTurns() {
 
 export async function getAssignations() {
   try {
-    const response = await axiosClient.get<AssignmentSummary[]>("/turns/assign");
+    const response = await axiosClient.get<TurnAssignment[]>("/turns/assign");
     return response.data;
   } catch (error) {
     throw new Error("Unknown error when getting assignations", { cause: error });

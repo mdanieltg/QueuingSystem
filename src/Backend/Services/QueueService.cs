@@ -115,15 +115,11 @@ public class QueueService : IQueueService
         };
     }
 
-    public IEnumerable<AssignationGroup> GetAssignations()
+    public IEnumerable<TurnAssignation> GetAssignations()
     {
         return _assignations
-            .GroupBy(a => a.Type)
-            .Select(g => new AssignationGroup
-            {
-                Type = g.Key,
-                Assignations = g.TakeLast(5).Reverse().ToList()
-            });
+            .TakeLast(10)
+            .Reverse();
     }
 
     public TurnAssignation? AssignTurn(Guid agentId)

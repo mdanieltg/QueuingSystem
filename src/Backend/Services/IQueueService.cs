@@ -12,6 +12,6 @@ public interface IQueueService
     bool? ToggleAgentStatus(Guid agentId);
     Turn CreateTurn(string role);
     TurnsSummary GetTurnsSummary(TurnStatus status);
-    IEnumerable<AssignationGroup> GetAssignations();
+    IEnumerable<TurnAssignation> GetAssignations();
     TurnAssignation? AssignTurn(Guid agentId);
 }

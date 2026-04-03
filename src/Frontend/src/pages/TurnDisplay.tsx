@@ -5,9 +5,8 @@ import { AgentRole } from "../models/AgentRole.ts";
 import * as signalR from "@microsoft/signalr";
 
 export default function TurnDisplay() {
-  const [currentTurn, setCurrentTurn] = useState<TurnAssignment | null>(null);
-  const [ejecutivoTurns, setEjecutivoTurns] = useState<TurnAssignment[]>([]);
-  const [ventanillaTurns, setVentanillaTurns] = useState<TurnAssignment[]>([]);
+  const [latestTurn, setLatestTurn] = useState<TurnAssignment | null>(null);
+  const [recentTurns, setRecentTurns] = useState<TurnAssignment[]>([]);
   const [queue, setQueue] = useState<number>(0);
   const TURN_ASSIGNED = "turnAssigned";
   const TURN_CREATED = "turnCreated";
@@ -23,9 +22,8 @@ export default function TurnDisplay() {
 
   async function fetchTurns() {
     try {
-      const turns = await getAssignations();
-      setEjecutivoTurns(turns.find(t => t.type === AgentRole.EXECUTIVE)?.assignations ?? []);
-      setVentanillaTurns(turns.find(t => t.type === AgentRole.WINDOW)?.assignations ?? []);
+      const allAssignations = await getAssignations();
+      setRecentTurns(allAssignations);
     } catch (error) {
       console.error("Error fetching assignations:", error);
     }
@@ -45,14 +43,14 @@ export default function TurnDisplay() {
     });
 
     connection.on(TURN_ASSIGNED, async (turn: string, type: string, station: string) => {
-      if (type === AgentRole.EXECUTIVE)
-        setCurrentTurn({ turn: turn, type: type, station: station });
-      else if (type === AgentRole.WINDOW)
-        setCurrentTurn({ turn: turn, type: type, station: station });
+      if (type === AgentRole.EXECUTIVE || type === AgentRole.WINDOW)
+        setLatestTurn({ turn: turn, type: type, station: station });
       else {
-        setCurrentTurn(null);
+        console.error("Invalid role:", type);
+        setLatestTurn(null);
       }
       await fetchTurns();
+      await fetchQueue();
     });
 
     connection.start()
@@ -78,26 +76,22 @@ export default function TurnDisplay() {
   return (
     <div className="container">
       <h1>Recent turns</h1>
-      {currentTurn &&
+      {latestTurn &&
         <div className="alert alert-primary text-center">
-          Turn: {currentTurn.turn} at {currentTurn.type} {currentTurn.station}
+          Turn: {latestTurn.turn} at {latestTurn.type} {latestTurn.station}
         </div>
       }
-      <div className="row">
-        <div className="col">
-          <h2>Window</h2>
-          <ul>
-            {ventanillaTurns.map(turn => <li key={turn.turn}>{turn.turn} {turn.type} {turn.station}</li>)}
-          </ul>
-        </div>
-        <div className="col">
-          <h2>Executive</h2>
-          <ul>
-            {ejecutivoTurns.map(turn => <li key={turn.turn}>{turn.turn} {turn.type} {turn.station}</li>)}
-          </ul>
-        </div>
-        <div>Customers waiting: {queue}</div>
+      <div>
+        <h2>Previous turns</h2>
+        <ul className="list-group">
+          {recentTurns.map(turn =>
+            <li key={turn.turn} className="list-group-item d-flex justify-content-between align-items-center" >
+              {turn.turn}
+              <span className="badge text-bg-primary rounded-pill">{turn.type} {turn.station}</span>
+            </li>)}
+        </ul>
       </div>
+      <div className="mt-3">Customers waiting: {queue}</div>
     </div>
   );
 }
